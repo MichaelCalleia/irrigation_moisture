@@ -59,10 +59,16 @@
     // watering controls
     float wateringlength = 650; //amount of time to water (run pump for 0.65 secends to diliver 0.5 fluid ounces)
     int wateringcount = 0; // set watering count to 0
-    
+
+    // Set times in Global
+    DateTime now;
 
 void setup () {
   Serial.begin(9600);
+
+  /* Relay code */
+    // Set RelayPin as an output pin
+      pinMode(RelayPin, OUTPUT);
 
   /* LCD code */
     // set up the LCD's number of columns and rows:
@@ -93,18 +99,14 @@ void setup () {
       rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
-  /* Relay code */
-    // Set RelayPin as an output pin
-      pinMode(RelayPin, OUTPUT);
-
   /* Moisture Sensor code */
     // set up sensor
     if (!ss.begin(0x36)) {
-      lcd.println("ERROR! seesaw not found");
+      lcd.print("ERROR! seesaw not found");
       while(1) delay(1);
     } else {
       lcd.print("seesaw started! version: ");
-      lcd.println(ss.getVersion(), HEX);
+      lcd.print(ss.getVersion(), HEX);
     }
     delay(3000); // pause to show message for 3 seconds
 	
@@ -115,6 +117,43 @@ void setup () {
     lcd.print("Ready");
     delay(3000); // pause to show message for 3 seconds
 
+    // clear the screen
+    lcd.clear();
+
+    DateTime now = rtc.now();
+ 
+    // set LCD cursor to column 0, line 0 
+    // LCD has 16 characters and 2 rows
+    // line 0 is the first row, line 1 is the second row
+    lcd.setCursor(0, 0);
+
+    if (now.month() < 10){
+      lcd.print('0');
+    }
+    lcd.print(now.month(), DEC);
+    lcd.print('/');
+    if (now.day() < 10){
+      lcd.print('0');
+    }
+    lcd.print(now.day(), DEC);
+    lcd.print(" ");
+    if (now.hour() < 10){
+      lcd.print('0');
+    }
+    lcd.print(now.hour(), DEC);
+    lcd.print(':');
+    if (now.minute() < 10){
+      lcd.print('0');
+    }
+    lcd.print(now.minute(), DEC);
+
+    // print the number of time the plant has been watered
+
+    // set LCD cursor to column 0, line 1 
+    lcd.setCursor(0, 1);
+    lcd.print("Count: ");
+    lcd.print (wateringcount);
+
 }
 
 void loop () {
@@ -124,7 +163,7 @@ void loop () {
    Serial.print("Capacitive: "); Serial.println(capread);
    
    //looks at how moist the soil is and waters it if it is getting dry
-   if (capread <= 650){
+   if (capread <= 900){ // was 650, but plant was wilting
     
     /* Water the plant */
 
@@ -176,43 +215,34 @@ void loop () {
 
     // set LCD cursor to column 0, line 1 
     lcd.setCursor(0, 1);
-    lcd.print("Count: " + wateringcount);
+    lcd.print("Count: ");
+    lcd.print (wateringcount);
 
     /* write data to EEPROM, date/time of each watering */
     // build a string combining the data and converting to binary to save space
-    String val = String(now.month(), BIN) + String(now.day(), BIN) + String(now.hour(), BIN) + String(now.minute(), BIN);
+    String data = "";
+    if (now.month() < 10){ data += ('0'); }
+    data += String(now.month(), DEC); 
+    if (now.day() < 10){ data += ('0'); }
+    data += String(now.day(), DEC); 
+    if (now.hour() < 10){ data += ('0'); }
+    data += String(now.hour(), DEC);
+    if (now.minute() < 10){ data += ('0'); }
+    data += String(now.minute(), DEC);
 
-    // Convert the binary string to actual binary data
-    byte binaryData[20]; // Adjust size according to your needs
-    int binaryDataLength = 0; // This will be set by the conversion function
-    binaryStringToByteArray(val, binaryData, binaryDataLength);
-
-    // Write the binary data to EEPROM
-    for (int i = 0; i < binaryDataLength; i++) {
-      EEPROM.put(addr + i, binaryData[i]);
+   // Write the string data to EEPROM
+    for (int i = 0; i < data.length(); i++) {
+        EEPROM.put(addr + i, data[i]);
     }
 
     // Update the start address for next write to avoid overwriting
-    addr += binaryDataLength;
-    if (addr >= EEPROM.length() - binaryDataLength) { // Check to avoid EEPROM overflow
-      addr = 0; // Reset address or handle as needed
+    addr += data.length();  // Use the length of the data instead of a fixed number
+    if (addr >= EEPROM.length() - data.length()) {  // Check to avoid EEPROM overflow
+        addr = 0; // Reset address or handle as needed
     }
-
-   }
+    
+  }
 
  delay(60000);
 
-}
-
-// Function to convert binary string to byte array
-void binaryStringToByteArray(String binaryString, byte* byteArray, int &length) {
-  length = (binaryString.length() + 7) / 8; // Calculate the number of bytes needed
-  for (int i = 0; i < length; i++) {
-    byteArray[i] = 0; // Initialize byte
-    for (int bit = 0; bit < 8; bit++) {
-      if (i * 8 + bit < binaryString.length() && binaryString[i * 8 + bit] == '1') {
-        byteArray[i] |= (1 << (7 - bit)); // Set bit
-      }
-    }
-  }
 }
