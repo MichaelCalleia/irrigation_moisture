@@ -1,7 +1,7 @@
 /* 
-  v2
+  v3
   Arduino irrigation system
- Soil moisture
+  Soil moisture
 */
 
 
@@ -57,11 +57,12 @@
     int RelayPin = 6; 
 
     // watering controls
-    float wateringlength = 650; //amount of time to water (run pump for 0.65 secends to diliver 0.5 fluid ounces)
+    int moisture = 1010; // was 650, but plant was wilting, changed to 900, then to 1010
+    int wateringlength = 650; //amount of time to water (run pump for 0.65 secends to diliver 0.5 fluid ounces)
     int wateringcount = 0; // set watering count to 0
 
     // Set times in Global
-    DateTime now;
+    DateTime current;
 
 void setup () {
   Serial.begin(9600);
@@ -99,6 +100,9 @@ void setup () {
       rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
+    // Get the time
+    current = rtc.now();
+
   /* Moisture Sensor code */
     // set up sensor
     if (!ss.begin(0x36)) {
@@ -119,52 +123,34 @@ void setup () {
 
     // clear the screen
     lcd.clear();
-
-    DateTime now = rtc.now();
  
     // set LCD cursor to column 0, line 0 
-    // LCD has 16 characters and 2 rows
-    // line 0 is the first row, line 1 is the second row
+    // print the currnet time 
     lcd.setCursor(0, 0);
-
-    if (now.month() < 10){
-      lcd.print('0');
-    }
-    lcd.print(now.month(), DEC);
-    lcd.print('/');
-    if (now.day() < 10){
-      lcd.print('0');
-    }
-    lcd.print(now.day(), DEC);
-    lcd.print(" ");
-    if (now.hour() < 10){
-      lcd.print('0');
-    }
-    lcd.print(now.hour(), DEC);
-    lcd.print(':');
-    if (now.minute() < 10){
-      lcd.print('0');
-    }
-    lcd.print(now.minute(), DEC);
-
-    // print the number of time the plant has been watered
+    printCurrentDateime ();
 
     // set LCD cursor to column 0, line 1 
+    // print the number of time the plant has been watered
     lcd.setCursor(0, 1);
-    lcd.print("Count: ");
-    lcd.print (wateringcount);
-
+    printWateringCount();
 }
 
 void loop () {
    
    // take the moisture levil of the soil, capread or capacitive read is how moist the soil is
-   uint16_t capread = ss.touchRead(0);
-   Serial.print("Capacitive: "); Serial.println(capread);
+    uint16_t capread = ss.touchRead(0);
+    Serial.println("Capacitive: "); Serial.println(capread);
+
+    Serial.print("Count: ");
+    Serial.println (wateringcount);
+
    
    //looks at how moist the soil is and waters it if it is getting dry
-   if (capread <= 900){ // was 650, but plant was wilting
-    
+   if (capread <= moisture){ 
+
+    // clear the screen
+    lcd.clear();
+
     /* Water the plant */
 
     // Turn on the relay to water plant
@@ -175,7 +161,7 @@ void loop () {
     digitalWrite(RelayPin, LOW);
   
     //get the time
-    DateTime now = rtc.now();
+    current = rtc.now();
 
     /* Add +1 to number of time the plant has been watered */
     wateringcount = wateringcount + 1;
@@ -185,50 +171,31 @@ void loop () {
 
     // clear the screen
     lcd.clear();
+    delay(1000);
+    lcd.begin(16, 2);
 
     // set LCD cursor to column 0, line 0 
     // LCD has 16 characters and 2 rows
     // line 0 is the first row, line 1 is the second row
     lcd.setCursor(0, 0);
-
-    if (now.month() < 10){
-      lcd.print('0');
-    }
-    lcd.print(now.month(), DEC);
-    lcd.print('/');
-    if (now.day() < 10){
-      lcd.print('0');
-    }
-    lcd.print(now.day(), DEC);
-    lcd.print(" ");
-    if (now.hour() < 10){
-      lcd.print('0');
-    }
-    lcd.print(now.hour(), DEC);
-    lcd.print(':');
-    if (now.minute() < 10){
-      lcd.print('0');
-    }
-    lcd.print(now.minute(), DEC);
+    printCurrentDateime();
 
     // print the number of time the plant has been watered
-
     // set LCD cursor to column 0, line 1 
     lcd.setCursor(0, 1);
-    lcd.print("Count: ");
-    lcd.print (wateringcount);
+    printWateringCount ();
 
     /* write data to EEPROM, date/time of each watering */
     // build a string combining the data and converting to binary to save space
     String data = "";
-    if (now.month() < 10){ data += ('0'); }
-    data += String(now.month(), DEC); 
-    if (now.day() < 10){ data += ('0'); }
-    data += String(now.day(), DEC); 
-    if (now.hour() < 10){ data += ('0'); }
-    data += String(now.hour(), DEC);
-    if (now.minute() < 10){ data += ('0'); }
-    data += String(now.minute(), DEC);
+    if (current.month() < 10){ data += ('0'); }
+    data += String(current.month(), DEC); 
+    if (current.day() < 10){ data += ('0'); }
+    data += String(current.day(), DEC); 
+    if (current.hour() < 10){ data += ('0'); }
+    data += String(current.hour(), DEC);
+    if (current.minute() < 10){ data += ('0'); }
+    data += String(current.minute(), DEC);
 
    // Write the string data to EEPROM
     for (int i = 0; i < data.length(); i++) {
@@ -245,4 +212,44 @@ void loop () {
 
  delay(60000);
 
+}
+
+void printCurrentDateime () {
+    // month
+    if (current.month() < 10){
+      lcd.print('0');
+    }
+    lcd.print(current.month(), DEC);
+    lcd.print('/');
+    // day
+    if (current.day() < 10){
+      lcd.print('0');
+    }
+    lcd.print(current.day(), DEC);
+    lcd.print(" ");
+    // hour
+    if (current.hour() < 10){
+      lcd.print('0');
+    }
+    lcd.print(current.hour(), DEC);
+    lcd.print(':');
+    //minute
+    if (current.minute() < 10){
+      lcd.print('0');
+    }
+    
+    lcd.print(current.minute(), DEC);
+}
+
+void printTemp () {
+  lcd.print("Temp: ");
+    byte celsius = (rtc.getTemperature());
+    byte fahrenheit = (celsius * 9) / 5 + 32;
+    lcd.print (fahrenheit);
+    lcd.print(" F");
+}
+
+void printWateringCount () {
+    lcd.print("Count: ");
+    lcd.print (wateringcount);
 }
